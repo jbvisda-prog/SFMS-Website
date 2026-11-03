@@ -1,0 +1,54 @@
+{% extends "base.html" %}{% block title %}Dashboard | SFMS{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">YOUR OVERVIEW</div><h1>Financial Dashboard</h1><p class="muted">Track your income, expenses, and savings progress.</p></div></div>
+<section class="summary-grid">
+  <article class="summary-card"><span>Total Income</span><strong>₱{{ '{:,.2f}'.format(income) }}</strong></article>
+  <article class="summary-card"><span>Total Expenses</span><strong>₱{{ '{:,.2f}'.format(expenses) }}</strong></article>
+  <article class="summary-card"><span>Balance</span><strong>₱{{ '{:,.2f}'.format(balance) }}</strong></article>
+</section>
+<section class="panel">
+  <h2>Add Income / Expenses</h2>
+  <form method="post" action="{{ url_for('add_transaction') }}" class="transaction-form">
+    <label>Type<select name="transaction_type" id="typeSelect"><option value="income">Income</option><option value="expenses">Expenses</option></select></label>
+    <label>Amount (₱)<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+    <label id="categoryWrap" class="hidden">Category<select name="category" id="categorySelect">
+      {% for c in ['Food','Transportation','Electricity bill','Water bill','Internet bill','Rent bill','Entertainment','Others'] %}<option>{{ c }}</option>{% endfor %}
+    </select></label>
+    <label id="otherWrap" class="hidden">Specify Other<input name="other_category" id="otherInput" placeholder="Expense category"></label>
+    <button class="primary">Add Transaction</button>
+  </form>
+  <div class="action-row">
+    <form method="post" action="{{ url_for('undo_transaction') }}"><button class="secondary">Undo Last Transaction</button></form>
+    <form method="post" action="{{ url_for('clear_transactions') }}" onsubmit="return confirm('Clear all your transactions?')"><button class="danger-btn">Clear All</button></form>
+  </div>
+</section>
+<section class="panel">
+  <h2>Monthly Savings Goal</h2>
+  <form method="post" action="{{ url_for('set_goal') }}" class="goal-form">
+    <label>Goal amount (₱)<input type="number" min="0.01" step="0.01" name="goal_amount" value="{{ goal if goal else '' }}" placeholder="Enter savings goal" required></label>
+    <button class="primary">Set Goal</button>
+  </form>
+  <div class="progress-head"><span>Progress</span><b>{{ '%.0f'|format(percent) }}%</b></div>
+  <div class="progress"><div style="width: {{ percent }}%"></div></div>
+  <p class="muted small">Based on your current balance and savings goal.</p>
+</section>
+<div class="alert {{ warning_type }}">{{ warning }}</div>
+<section class="content-grid">
+  <div class="panel"><h2>Transaction History</h2>
+    {% if rows %}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Category</th></tr></thead><tbody>
+    {% for row in rows %}<tr><td>{{ row.transaction_date.strftime('%Y-%m-%d %H:%M') if row.transaction_date else '' }}</td><td><span class="tag {{ row.transaction_type }}">{{ row.transaction_type|title }}</span></td><td>₱{{ '{:,.2f}'.format(row.amount|float) }}</td><td>{{ row.category or '—' }}</td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<p class="muted">No transactions yet. Add your first transaction above.</p>{% endif %}
+  </div>
+  <div class="panel"><h2>Expenses Analytics</h2>
+    {% if chart_rows %}<canvas id="expenseChart"></canvas>{% else %}<p class="muted">No expenses yet. Add an expense to display analytics.</p>{% endif %}
+  </div>
+</section>
+<script>
+const typeSelect=document.getElementById('typeSelect'), categoryWrap=document.getElementById('categoryWrap'), otherWrap=document.getElementById('otherWrap'), categorySelect=document.getElementById('categorySelect'), otherInput=document.getElementById('otherInput');
+function updateFields(){const isExpense=typeSelect.value==='expenses';categoryWrap.classList.toggle('hidden',!isExpense);const isOther=isExpense&&categorySelect.value==='Others';otherWrap.classList.toggle('hidden',!isOther);otherInput.required=isOther;}
+typeSelect.addEventListener('change',updateFields);categorySelect.addEventListener('change',updateFields);updateFields();
+{% if chart_rows %}
+new Chart(document.getElementById('expenseChart'),{type:'doughnut',data:{labels:{{ chart_rows|map(attribute='category')|list|tojson }},datasets:[{data:{{ chart_rows|map(attribute='total')|list|tojson }},borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}});
+{% endif %}
+</script>
+{% endblock %}
